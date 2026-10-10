@@ -1,7 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { pointerDirection, smoothstep, createVideoSeeker } from '../src/lib/interaction.js';
 import { advanceHeroMotion, createHeroMotion, HERO_DIRECTIONS } from '../src/lib/heroMotion.js';
+import { BIOGRAPHY, nextStoryStep } from '../src/lib/biography.js';
+
+test('scene end frames, transition poster and right-positioned fallback are available', () => {
+  for (const name of ['works-end.png', 'biography-end.png', 'workstation-right.png', 'biography-to-works-poster.png']) {
+    const file = readFileSync(new URL(`../public/assets/images/${name}`, import.meta.url));
+    assert.equal(file.subarray(1, 4).toString(), 'PNG', `${name} must be a real PNG, not an HTML fallback`);
+    assert.ok(file.readUInt32BE(16) >= 1280, `${name} must contain the full-resolution scene`);
+    assert.ok(file.readUInt32BE(20) >= 720);
+  }
+});
+
+test('the five requested resume entries precede works and reverse navigation preserves the last chapter', () => {
+  assert.deepEqual(BIOGRAPHY.map(item => item.id), ['internship', 'masters', 'bachelors', 'zero-code', 'super-agent']);
+  let position = nextStoryStep('home', 0, 1);
+  assert.deepEqual(position, { scene: 'biography', index: 0 });
+  for (let index = 1; index < 5; index++) {
+    position = nextStoryStep(position.scene, position.index, 1);
+    assert.deepEqual(position, { scene: 'biography', index });
+  }
+  assert.equal(nextStoryStep(position.scene, position.index, 1).scene, 'works');
+  assert.deepEqual(nextStoryStep('works', 0, -1), { scene: 'biography', index: 4 });
+  for (let index = 3; index >= 0; index--) {
+    position = nextStoryStep(position.scene, position.index, -1);
+    assert.deepEqual(position, { scene: 'biography', index });
+  }
+  assert.equal(nextStoryStep('biography', 0, -1).scene, 'home');
+  assert.equal(nextStoryStep('home', 0, -1).scene, 'home');
+  assert.equal(nextStoryStep('works', 4, 1).scene, 'works');
+});
 
 test('rapid direction changes keep position and velocity continuous, then settle on the latest request', () => {
   const motion = createHeroMotion();

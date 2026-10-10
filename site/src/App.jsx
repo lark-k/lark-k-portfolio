@@ -10,6 +10,8 @@ import RippleDistortion from './components/RippleDistortion';
 import FolderPreview from './components/FolderPreview';
 import StarBorder from './components/StarBorder';
 import ShinyText from './components/ShinyText';
+import Biography from './components/Biography';
+import { SCENES, nextStoryStep } from './lib/biography';
 import { asset, pointerDirection } from './lib/interaction';
 import { createHeroFramePlayer } from './lib/heroFrames';
 
@@ -19,24 +21,42 @@ const GridScan = lazy(() => import('./components/GridScan').then(module => ({ de
 const headingShine = { color: '#f5f2df', shineColor: '#ffffff', shineAccent: '#eac17c', speed: 2, shineWidth: 40, softness: .8, trigger: 'loop', direction: 'right' };
 
 export function App() {
-  const heroFrameRef = useRef(null), transitionRef = useRef(null), mediaRef = useRef(null);
+  const heroFrameRef = useRef(null), transitionRef = useRef(null), biographyVideoRef = useRef(null), mediaRef = useRef(null);
   const playerRef = useRef(null), locked = useRef(false), stateRef = useRef({});
   const transitionFrameRef = useRef(null);
   const [scene, setScene] = useState('home');
   const [motion, setMotion] = useState('idle');
   const [transitionReady, setTransitionReady] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState('biography');
+  const [transitionClip, setTransitionClip] = useState('biography');
+  const [biographyIndex, setBiographyIndex] = useState(0);
+  const chapterChangedAt = useRef(0);
   const [direction, setDirection] = useState('default');
   const [folderOpen, setFolderOpen] = useState(false);
   const [trailEnabled, setTrailEnabled] = useState(true);
   const [heroLoad, setHeroLoad] = useState({ decoded: 0, uploaded: 0, total: 125, ready: false });
   const [badgeReady, setBadgeReady] = useState(false);
+  const [badgeActive, setBadgeActive] = useState(false);
   const [entered, setEntered] = useState(false);
   const prepared = heroLoad.ready && badgeReady;
   const loadPercent = Math.min(100, Math.round((heroLoad.decoded / heroLoad.total * .55 + heroLoad.uploaded / heroLoad.total * .35 + (badgeReady ? .1 : 0)) * 100));
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  stateRef.current = { scene, motion, folderOpen, reducedMotion, direction, entered };
-  const worksVisible = scene === 'works' && motion === 'idle';
-  const homeVisible = scene === 'home' && motion !== 'forward';
+  stateRef.current = { scene, motion, folderOpen, reducedMotion, direction, entered, biographyIndex, transitionTarget };
+  // Content enters when navigation starts. Completing (or chaining) a video
+  // must keep the same content scene so its entrance never restarts.
+  const contentScene = motion === 'bridging' || motion === 'forward' ? transitionTarget : scene;
+  const worksVisible = contentScene === 'works';
+  const biographyVisible = contentScene === 'biography';
+  const homeVisible = contentScene === 'home';
+  const homeBackdropVisible = scene === 'home' && motion !== 'forward';
+  const worksSettled = scene === 'works' && motion === 'idle';
+
+  useEffect(() => {
+    if (!entered || !homeVisible) { setBadgeActive(false); return; }
+    // Start the physical drop with the badge's slot in the page entrance.
+    const timer = window.setTimeout(() => setBadgeActive(true), reducedMotion ? 0 : 680);
+    return () => window.clearTimeout(timer);
+  }, [entered, homeVisible, reducedMotion]);
 
   useEffect(() => {
     if (!prepared) return;
@@ -96,9 +116,10 @@ export function App() {
   const finishTravel = target => {
     transitionFrameRef.current?.(); transitionFrameRef.current = null;
     setScene(target); setMotion('idle'); locked.current = false;
+    chapterChangedAt.current = performance.now();
     if (target === 'home') {
       setDirection('default'); setTransitionReady(false);
-      transitionRef.current.pause(); playerRef.current.reset(); mediaRef.current = heroFrameRef.current;
+      transitionRef.current.pause(); biographyVideoRef.current.pause(); playerRef.current.reset(); mediaRef.current = heroFrameRef.current;
       if (!stateRef.current.reducedMotion) {
         setMotion('returning'); locked.current = true;
       }
@@ -109,80 +130,127 @@ export function App() {
     const state = stateRef.current;
     if (!state.entered || locked.current || state.folderOpen || state.scene === target) return;
     locked.current = true;
-    if (target === 'home' || state.reducedMotion) { finishTravel(target); return; }
-    // Hold the actual pose beneath the video; never queue a return to the front.
-    playerRef.current.pause();
-    setTransitionReady(false); setMotion('forward');
-    const video = transitionRef.current;
-    video.currentTime = 0; video.playbackRate = 3.8;
-    video.play().catch(() => finishTravel(target));
+    // Each clip starts from its actual preceding scene, including direct home-to-works visits.
+    if (target === 'home' || state.reducedMotion || (state.scene !== 'home' && target !== 'works')) {
+      transitionRef.current.pause(); biographyVideoRef.current.pause();
+      setTransitionReady(false); finishTravel(target); return;
+    }
+    setDirection('default'); setTransitionTarget(target);
+    setTransitionReady(false); setMotion('bridging');
+    const run = () => {
+      const clip = state.scene === 'home' ? 'biography' : 'works';
+      setTransitionClip(clip);
+      const video = clip === 'biography' ? biographyVideoRef.current : transitionRef.current;
+      video.currentTime = 0; video.playbackRate = clip === 'biography' ? 2.4 : 2.7;
+      setMotion('forward');
+      video.play().catch(() => { setTransitionReady(false); finishTravel(target); });
+    };
+    if (state.scene === 'home') playerRef.current.returnToFront(run);
+    else { biographyVideoRef.current.pause(); run(); }
   };
-  const revealTransition = () => {
-    if (!locked.current) return;
+  const finishBiographyClip = () => {
+    if (transitionTarget !== 'works') { finishTravel('biography'); return; }
+    transitionFrameRef.current?.(); transitionFrameRef.current = null;
+    // Hold the biography end frame while the following clip presents its first frame.
+    setScene('biography'); setTransitionReady(false); setTransitionClip('works');
     const video = transitionRef.current;
+    video.currentTime = 0; video.playbackRate = 2.7;
+    video.play().catch(() => { setTransitionReady(false); finishTravel('works'); });
+  };
+  const revealTransition = video => {
+    if (!locked.current) return;
     transitionFrameRef.current?.();
     // Keep the frozen canvas visible until a fresh video frame is presented,
     // including repeat visits when the video previously held its last frame.
     if (video.requestVideoFrameCallback) {
       const id = video.requestVideoFrameCallback(() => {
         transitionFrameRef.current = null;
+        if (!locked.current) return;
         setTransitionReady(true);
       });
       transitionFrameRef.current = () => video.cancelVideoFrameCallback(id);
     } else setTransitionReady(true);
   };
+  const selectBiography = index => {
+    if (locked.current) return;
+    setBiographyIndex(index); chapterChangedAt.current = performance.now();
+  };
+  const stepStory = direction => {
+    const state = stateRef.current;
+    if (locked.current || state.folderOpen || !state.entered || performance.now() - chapterChangedAt.current < 650) return;
+    const next = nextStoryStep(state.scene, state.biographyIndex, direction);
+    setBiographyIndex(next.index); chapterChangedAt.current = performance.now();
+    if (next.scene !== state.scene) travel(next.scene);
+  };
+  const stepStoryRef = useRef(stepStory); stepStoryRef.current = stepStory;
   const travelRef = useRef(travel); travelRef.current = travel;
   useEffect(() => {
-    let wheelDelta = 0, lastWheel = 0, touchY = 0;
+    let wheelDelta = 0, lastWheel = 0, touchY = 0, gestureUsed = false;
     const wheel = event => {
       if (stateRef.current.folderOpen || event.target.closest?.('.lanyard-canvas')?.style.cursor === 'grabbing') return;
+      const panel = event.target.closest?.('.biography-layout');
+      if (panel && panel.scrollHeight > panel.clientHeight + 1 &&
+        ((event.deltaY > 0 && panel.scrollTop + panel.clientHeight < panel.scrollHeight - 2) || (event.deltaY < 0 && panel.scrollTop > 2))) return;
       event.preventDefault();
-      if (locked.current) return;
-      if (performance.now() - lastWheel > 250) wheelDelta = 0;
+      if (performance.now() - lastWheel > 250) { wheelDelta = 0; gestureUsed = false; }
       lastWheel = performance.now();
+      if (locked.current || gestureUsed) return;
       wheelDelta += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
-      if (Math.abs(wheelDelta) > 28) { travelRef.current(wheelDelta > 0 ? 'works' : 'home'); wheelDelta = 0; }
+      if (Math.abs(wheelDelta) > 28) { gestureUsed = true; stepStoryRef.current(wheelDelta > 0 ? 1 : -1); wheelDelta = 0; }
     };
     const key = event => {
-      if (stateRef.current.folderOpen || event.target.closest?.('.lanyard') || !['ArrowDown','PageDown','ArrowUp','PageUp','Home','End',' '].includes(event.key)) return;
+      if (stateRef.current.folderOpen || event.target.closest?.('.lanyard') || !['ArrowDown','PageDown','ArrowUp','PageUp','ArrowLeft','ArrowRight','Home','End',' '].includes(event.key)) return;
       if (['BUTTON','A','INPUT'].includes(document.activeElement?.tagName)) return;
       event.preventDefault();
-      travelRef.current(['ArrowUp','PageUp','Home'].includes(event.key) ? 'home' : 'works');
+      if (event.key === 'Home' || event.key === 'End') travelRef.current(event.key === 'Home' ? 'home' : 'works');
+      else stepStoryRef.current(['ArrowUp','PageUp','ArrowLeft'].includes(event.key) ? -1 : 1);
     };
-    const start = event => { touchY = event.target.closest?.('.lanyard') ? null : event.changedTouches[0].clientY; };
+    const start = event => {
+      const panel = event.target.closest?.('.biography-layout');
+      touchY = event.target.closest?.('.lanyard') || (panel && panel.scrollHeight > panel.clientHeight) ? null : event.changedTouches[0].clientY;
+    };
     const end = event => {
       if (stateRef.current.folderOpen || touchY === null) return;
       const delta = touchY - event.changedTouches[0].clientY;
-      if (Math.abs(delta) > 55) travelRef.current(delta > 0 ? 'works' : 'home');
+      if (Math.abs(delta) > 55) stepStoryRef.current(delta > 0 ? 1 : -1);
     };
     window.addEventListener('wheel', wheel, { passive: false }); window.addEventListener('keydown', key);
     window.addEventListener('touchstart', start, { passive: true }); window.addEventListener('touchend', end, { passive: true });
     return () => { window.removeEventListener('wheel', wheel); window.removeEventListener('keydown', key); window.removeEventListener('touchstart', start); window.removeEventListener('touchend', end); };
   }, []);
-  const navigate = (event, target) => { event.preventDefault(); travel(target); };
+  const navigate = (event, target) => { event.preventDefault(); if (target === 'biography' && scene !== 'biography') setBiographyIndex(0); travel(target); };
 
   return <main className="scroll-story">
-    <div className={`scene-stage ${motion === 'returning' ? 'is-returning' : ''}`} inert={!entered ? true : undefined} style={{ backgroundImage: `url("${asset('images/background.png')}")` }}>
+    <div className={`scene-stage ${entered ? 'is-entered' : ''} ${motion === 'returning' ? 'is-returning' : ''}`} inert={!entered ? true : undefined} style={{ backgroundImage: `url("${asset('images/background.png')}")` }}>
       <div className="character-field" style={{ opacity: scene === 'home' ? 1 : 0 }}>
         <RippleDistortion src={asset('frames/1280/up/01.webp?v=bt709-3')} fallbackSrc={asset(worksVisible ? 'images/workstation.png' : 'images/hero-poster.png')}
           mediaRef={mediaRef} brushSize={80} strength={.055} swirl={2.05} rings={3.75} grayscale={false}
           spread={6.5} fade={.9} spacing={8} dispersion={.5} tintAmount={0} quality="low" portraitFraming
-          enabled={entered && trailEnabled && homeVisible && !folderOpen && !reducedMotion} active={homeVisible && !folderOpen} onLoadProgress={setHeroLoad} />
+          enabled={entered && trailEnabled && homeVisible && !folderOpen && !reducedMotion} active={homeBackdropVisible && !folderOpen} onLoadProgress={setHeroLoad} />
       </div>
-      <video className={`scene-video ${!reducedMotion && (transitionReady || worksVisible) ? 'is-visible' : ''}`} ref={transitionRef}
-        src={asset('videos/transition.mp4')} poster={asset('images/transition-poster.png')} muted playsInline preload="auto" aria-hidden="true"
-        onPlaying={revealTransition} onEnded={() => finishTravel('works')} />
-      {reducedMotion && <img className="reduced-scene" src={asset(worksVisible ? 'images/workstation.png' : 'images/hero-poster.png')} alt="" />}
+      <img className={`scene-still works-scene ${worksSettled ? 'is-visible' : ''}`} src={asset('images/works-end.png?v=2')} alt=""
+        onError={event => { const image = event.currentTarget; if (!image.src.endsWith('/images/workstation-right.png')) image.src = asset('images/workstation-right.png'); }} />
+      {/* Reverse visits use the sharp original; forward visits retain the video's
+          final frame so its slightly different pose never jumps after playback. */}
+      <img className={`scene-still biography-scene ${scene === 'biography' && (motion !== 'forward' || !transitionReady) ? 'is-visible' : ''}`} src={asset('images/biography-welcome.png')} alt="" />
+      <video className={`scene-video works-scene ${!reducedMotion && transitionReady && transitionClip === 'works' && (motion === 'forward' || worksSettled) ? 'is-visible' : ''}`} ref={transitionRef}
+        src={asset('videos/biography-to-works.mp4')} poster={asset('images/biography-to-works-poster.png')} muted playsInline preload="auto" aria-hidden="true"
+        onPlaying={event => revealTransition(event.currentTarget)} onEnded={() => finishTravel('works')} />
+      <video className={`scene-video biography-video ${!reducedMotion && transitionReady && transitionClip === 'biography' && (motion === 'forward' || (scene === 'biography' && motion === 'idle')) ? 'is-visible' : ''}`} ref={biographyVideoRef}
+        src={asset('videos/home-to-biography.mp4')} poster={asset('images/biography-start.png')} muted playsInline preload="auto" aria-hidden="true"
+        onPlaying={event => revealTransition(event.currentTarget)} onEnded={finishBiographyClip} />
+      {reducedMotion && homeVisible && <img className="reduced-scene" src={asset('images/hero-poster.png')} alt="" />}
       <div className={`scene-vignette ${homeVisible ? 'is-home' : ''}`} aria-hidden="true" />
-      <header className="site-header" inert={folderOpen ? true : undefined}>
+      <header key={contentScene} className="site-header" inert={folderOpen ? true : undefined}>
         <a href="#home" className="wordmark" onClick={event => navigate(event, 'home')} aria-label="Lark-K 首页">Lark<span>-</span>K</a>
-        <nav aria-label="主导航"><a href="#home" className={scene === 'home' ? 'is-active' : ''} aria-current={scene === 'home' ? 'page' : undefined} onClick={event => navigate(event, 'home')}>初次见面</a>
-          <a href="#works" className={scene === 'works' ? 'is-active' : ''} aria-current={scene === 'works' ? 'page' : undefined} onClick={event => navigate(event, 'works')}>作品文件夹</a></nav>
+        <nav aria-label="主导航"><a href="#home" className={contentScene === 'home' ? 'is-active' : ''} aria-current={contentScene === 'home' ? 'page' : undefined} onClick={event => navigate(event, 'home')}>初次见面</a>
+          <a href="#biography" className={contentScene === 'biography' ? 'is-active' : ''} aria-current={contentScene === 'biography' ? 'page' : undefined} onClick={event => navigate(event, 'biography')}>个人履历</a>
+          <a href="#works" className={contentScene === 'works' ? 'is-active' : ''} aria-current={contentScene === 'works' ? 'page' : undefined} onClick={event => navigate(event, 'works')}>作品文件夹</a></nav>
         <div className="header-signature"><strong>AI & BACKEND DEVELOPER</strong><span>A curious mind. A world of ideas.</span></div>
       </header>
       <section id="home" className={`hero-content ${homeVisible ? 'is-visible' : ''}`} aria-label="初次见面" aria-hidden={!homeVisible} inert={!homeVisible || motion === 'returning' ? true : undefined}
         onAnimationEnd={event => {
-          if (motion === 'returning' && event.target.matches('.scroll-cue') && event.animationName === 'home-layer-reveal') {
+          if (motion === 'returning' && event.target.matches('.scroll-cue') && event.animationName === 'scene-layer-reveal') {
             setMotion('idle'); locked.current = false;
           }
         }}>
@@ -199,7 +267,7 @@ export function App() {
           </StarBorder>
         </div>
         <aside className="hello"><h2>HELLO, YOU.</h2><p>移动鼠标，我会看向你的位置。</p><span>{directionLabels[direction]}</span></aside>
-        <a href="#works" className="scroll-cue" onClick={event => navigate(event, 'works')}><span>SCROLL TO EXPLORE</span><ArrowDown size={24} /></a>
+        <a href="#biography" className="scroll-cue" onClick={event => navigate(event, 'biography')}><span>SCROLL TO EXPLORE</span><ArrowDown size={24} /></a>
         <p className="hero-footnote">好奇，是一切创造的开始。<br /><span>CODE WITH CURIOSITY. CREATE WITH HEART.</span></p>
       </section>
       <aside className={`hero-lanyard ${homeVisible ? 'is-visible' : ''}`} aria-label="梁科互动名牌，翻面查看个人信息" aria-hidden={!homeVisible} inert={!homeVisible || motion === 'returning' ? true : undefined}>
@@ -208,22 +276,26 @@ export function App() {
             strapImage={asset('images/lanyard-strap.svg')} cardColor="#f5f0da" strapColor="#343e2b"
             size={.52} strapLength={.38} strapWidth={.8} finish="glossy" metal="gold"
             breeze={reducedMotion ? 0 : .7} breezeSpeed={1.6} damping={.65} elasticity={.35} intro={!reducedMotion}
-            active={homeVisible} interactive={entered && homeVisible && motion === 'idle'} onReady={() => setBadgeReady(true)} />
+            active={badgeActive && entered && homeVisible} interactive={badgeActive && homeVisible && motion === 'idle'} onReady={() => setBadgeReady(true)} />
         </Suspense>
         <p className="lanyard-hint">拖动玩一玩 · 翻面查看个人信息</p>
       </aside>
-      <section id="works" className={`works-content ${worksVisible ? 'is-visible' : ''} ${folderOpen ? 'has-expanded-folder' : ''}`} aria-label="作品文件夹" aria-hidden={!worksVisible} inert={!worksVisible ? true : undefined}>
+      <Biography visible={biographyVisible} index={biographyIndex} onSelect={selectBiography}
+        onNext={() => { const next = nextStoryStep('biography', biographyIndex, 1); if (next.scene === 'biography') selectBiography(next.index); else travel(next.scene); }}
+        onPrevious={() => { const next = nextStoryStep('biography', biographyIndex, -1); if (next.scene === 'biography') selectBiography(next.index); else travel(next.scene); }} />
+      <section id="works" className={`works-content ${worksVisible ? 'is-visible' : ''} ${folderOpen ? 'has-expanded-folder' : ''}`} aria-label="作品文件夹" aria-hidden={!worksVisible} inert={!worksVisible || motion !== 'idle' ? true : undefined}>
         <div className="works-sidebar">
-          <div className="works-title"><p className="eyebrow"><strong>02</strong> THE PORTFOLIO / 作品文件夹</p><h2><ShinyText text="MY PORTFOLIO." {...headingShine}
+          <div className="works-title"><p className="eyebrow"><strong>03</strong> THE PORTFOLIO / 作品文件夹</p><h2><ShinyText text="MY PORTFOLIO." {...headingShine}
             active={entered && worksVisible && !folderOpen} disabled={reducedMotion} /></h2>
-            <p className="works-description">把 AI、代码与探索，<br />装进我的作品文件夹。</p></div>
+            </div>
+          <p className="works-description">把 AI、代码与探索，<br />装进我的作品文件夹。</p>
           <div className="folder-position"><FolderPreview onOpenChange={setFolderOpen} reducedMotion={reducedMotion} /></div>
         </div>
         <p className="works-categories">AI PLATFORM · AI AGENT<br />QUANT · SMART ENERGY</p>
         <p className="works-footnote"><ArrowUpRight size={17} /> 小小文件夹，装着大大的好奇。</p>
       </section>
-      {!reducedMotion && <button inert={folderOpen ? true : undefined} className={`trail-toggle ${trailEnabled ? 'is-on' : ''}`} aria-label={trailEnabled ? '关闭鼠标水波效果' : '开启鼠标水波效果'} aria-pressed={trailEnabled} onClick={() => setTrailEnabled(value => !value)}><Sparkle size={18} /><span>RIPPLE {trailEnabled ? 'ON' : 'OFF'}</span></button>}
-      <div className="page-index" aria-hidden="true"><span>{scene === 'works' ? '02' : '01'}</span><span className="index-line" /><span>02</span></div>
+      {!reducedMotion && homeVisible && <button inert={folderOpen ? true : undefined} className={`trail-toggle ${trailEnabled ? 'is-on' : ''}`} aria-label={trailEnabled ? '关闭鼠标水波效果' : '开启鼠标水波效果'} aria-pressed={trailEnabled} onClick={() => setTrailEnabled(value => !value)}><Sparkle size={18} /><span>RIPPLE {trailEnabled ? 'ON' : 'OFF'}</span></button>}
+      <div key={`index-${contentScene}`} className="page-index" aria-hidden="true"><span>{String(SCENES.indexOf(contentScene) + 1).padStart(2, '0')}</span><span className="index-line" /><span>03</span></div>
     </div>
     {!entered && <div className={`startup-transition ${prepared ? 'is-ready' : ''}`} role="status" aria-live="polite" aria-label={`首页资源加载中，${loadPercent}%`}>
       <div className="startup-background" aria-hidden="true"><Suspense fallback={null}>

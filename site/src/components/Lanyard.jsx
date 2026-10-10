@@ -557,11 +557,12 @@ const placeHanging = (sim, layout, intro) => {
   nodes[0].copy(anchor);
   for (let i = 1; i <= JOINTS; i++) {
     nodes[i].copy(nodes[i - 1]);
-    if (intro) nodes[i].x += sim.rest;
+    // Park the whole card above the viewport, then let gravity and the elastic
+    // strap produce the entrance instead of swinging a finished badge in sideways.
+    if (intro) nodes[i].y += (layout.height + 0.25) / JOINTS;
     else nodes[i].y -= sim.rest;
   }
   body.quaternion.identity();
-  if (intro) body.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
   body.hang.set(0, layout.hangY, 0);
   const offset = scratch.a.copy(body.hang).applyQuaternion(body.quaternion);
   body.position.copy(nodes[JOINTS]).sub(offset);
@@ -1030,7 +1031,14 @@ const Lanyard = ({
         setCursor('');
       }
 
-      applied = { layoutKey, framingKey, imageKey, faceKey, strapColor: s.strapColor, strapScale };
+      if (s.active !== applied.active) {
+        cancelAnimationFrame(raf); raf = 0; time = 0;
+        sim.grab = null;
+        // Reset while hidden as well, so a repeat visit never exposes the old pose.
+        placeHanging(sim, layout, s.intro && !reducedMotion);
+        render();
+      }
+      applied = { layoutKey, framingKey, imageKey, faceKey, strapColor: s.strapColor, strapScale, active: s.active };
       start();
     };
 

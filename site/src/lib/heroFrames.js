@@ -8,7 +8,7 @@ export function createHeroFramePlayer(onFrame) {
   const width = 1280;
   let disposed = false, ready = false;
   const motion = createHeroMotion();
-  let raf = 0, lastTime = 0, paused = false;
+  let raf = 0, lastTime = 0, paused = false, returnBridge = null;
   const allBitmaps = [];
   const idle = () => new Promise(resolve => {
     if (window.requestIdleCallback) window.requestIdleCallback(resolve, { timeout: 200 });
@@ -64,6 +64,18 @@ export function createHeroFramePlayer(onFrame) {
   const tick = now => {
     raf = 0;
     if (disposed || paused || document.hidden || !ready) return;
+    if (returnBridge) {
+      const bridge = returnBridge;
+      const t = Math.min(1, (now - bridge.started) / bridge.duration);
+      motion.pose = bridge.from * (1 - t * t * (3 - 2 * t));
+      render();
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else {
+        returnBridge = null; motion.pose = 0; motion.velocity = 0; paused = true;
+        bridge.complete();
+      }
+      return;
+    }
     const delta = lastTime ? Math.min(.05, (now - lastTime) / 1000) : 0; lastTime = now;
     const moving = advanceHeroMotion(motion, delta);
     render();
@@ -81,7 +93,13 @@ export function createHeroFramePlayer(onFrame) {
       motion.requested = requested; wake();
     },
     pause() { paused = true; cancelAnimationFrame(raf); raf = 0; },
-    reset() { paused = false; Object.assign(motion, createHeroMotion()); if (ready) render(); },
+    returnToFront(complete) {
+      if (!ready || motion.pose < .008) { this.pause(); complete(); return; }
+      paused = false; motion.requested = 'default';
+      returnBridge = { from: clamp(motion.pose), started: performance.now(), duration: 180, complete };
+      wake();
+    },
+    reset() { paused = false; returnBridge = null; Object.assign(motion, createHeroMotion()); if (ready) render(); },
     dispose() { disposed = true; controller.abort(); cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', wake); allBitmaps.forEach(bitmap => bitmap.close()); },
   };
 }

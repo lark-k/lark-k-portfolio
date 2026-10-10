@@ -47,3 +47,12 @@ No remaining actionable P0/P1/P2 findings.
 ## Follow-up polish
 
 - None required for the requested scope. Independent project detail pages remain deferred; the new entries link directly to GitHub.
+
+## Biography and works navigation verification — 2026-10-10
+
+- Fixed missing works end-frame asset: browser previously reported complete=true with naturalWidth=0; updated source now decodes at 1280 × 720. Original workstation artwork is the load-error fallback.
+- Biography-to-works now reuses videos/transition.mp4 as requested. Browser wheel verification observed playing=true, playbackRate=3.8, currentTime=0.59, followed by #works with the character visible. Scrolling up restored the last biography chapter.
+- Removed the resume attribution prefix and expanded the left sidebar into six groups from the supplied resume. At 1600 × 900, the skills end at y=768 and the timeline begins at y=826; no overlap. At 390 × 844, the skills are visible in the scrollable content panel with no horizontal overflow.
+- Evidence: qa/biography-tech-stack.png and qa/works-after-biography.png. Temporary viewport overrides reset after verification.
+- Seven interaction/media checks and static build passed. Works end-frame exists in dist/client/assets/images. No deployment performed.
+- Browser error entries were historical from 14:27 UTC; verification completed around 14:48 UTC and introduced no new error entries.

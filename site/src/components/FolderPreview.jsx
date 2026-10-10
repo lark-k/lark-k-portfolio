@@ -72,6 +72,20 @@ export default function FolderPreview({ onOpenChange, reducedMotion }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [phase, reducedMotion]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (!active) return;
+    const stage = spreadRef.current.querySelector('.spread-stage');
+    const cardRow = spreadRef.current.querySelector('.spread-cards');
+    const fitCards = () => {
+      const scale = Math.min(1, stage.clientHeight / cardRow.offsetHeight);
+      stage.style.setProperty('--card-scale', String(scale));
+    };
+    const observer = new ResizeObserver(fitCards);
+    observer.observe(stage);
+    observer.observe(cardRow);
+    fitCards();
+    return () => observer.disconnect();
+  }, [active]);
 
   return <>
     <button className={`folder-trigger ${active ? 'is-expanded' : ''}`} ref={triggerRef}
