@@ -1,0 +1,27 @@
+.lanyard {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lanyard-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.lanyard-canvas:focus {
+  outline: none;
+}
+
+.hero-lanyard:has(.lanyard-canvas:focus-visible) .lanyard-hint {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+

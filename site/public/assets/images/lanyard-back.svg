@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="900" viewBox="0 0 640 900">
+  <rect width="640" height="900" fill="#35412e"/>
+  <g fill="#f5f0da" font-family="Arial, sans-serif">
+    <text x="44" y="277" font-size="72" font-weight="900" font-family="Microsoft YaHei, PingFang SC, sans-serif">个人信息</text>
+    <path d="M48 321h544" stroke="#f5f0da" stroke-opacity=".4"/>
+    <g fill="#f5f0da" font-size="30" font-weight="700" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+      <text x="48" y="382">电话</text>
+      <text x="48" y="505">邮箱</text>
+      <text x="48" y="628">GitHub</text>
+    </g>
+    <text x="48" y="431" font-size="48" font-weight="700" letter-spacing="1">15634299078</text>
+    <text x="48" y="554" font-size="44" font-weight="700">1573002354@qq.com</text>
+    <text x="48" y="677" font-size="44" font-weight="700">github.com/lark-k</text>
+    <path d="M48 735h544" stroke="#f5f0da" stroke-opacity=".4"/>
+    <text x="48" y="815" font-size="44" font-weight="900" font-family="Microsoft YaHei, PingFang SC, sans-serif">梁科</text>
+  </g>
+  <path d="m543 763 10 26 27 10-27 10-10 27-10-27-27-10 27-10z" fill="#e4b86e"/>
+</svg>

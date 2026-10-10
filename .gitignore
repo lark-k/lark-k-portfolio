@@ -1,0 +1,54 @@
+# Dependencies and package-manager caches
+node_modules/
+.npm/
+.pnpm-store/
+
+# Generated builds and tool caches
+/site/dist/
+.vite/
+.cache/
+coverage/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local environment secrets (keep shareable templates)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+
+# Local indexing, browser sessions, and editor settings
+.codegraph/
+.playwright-cli/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+/site/tmp/
+
+# Generated QA captures and obsolete preview frames
+/site/qa/
+/output/playwright/
+/site/output/playwright/
+playwright-report/
+test-results/
+
+# Keep original assets and runtime media versioned:
+# /assets/ and /site/public/assets/ (images, videos, lossless frames,
+# documents, and badge artwork). Do not ignore media by extension.
+# Also keep package-lock.json, .npmrc, source/test scripts, and
+# /site/.openai/hosting.json for reproducible builds and deployment.

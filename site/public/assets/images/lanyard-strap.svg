@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="120" viewBox="0 0 360 120">
+  <rect width="360" height="120" fill="#263322"/>
+  <path d="M0 8H360M0 112H360" stroke="#aeb897" stroke-opacity=".5" stroke-width="2" stroke-dasharray="9 9"/>
+  <text x="180" y="86" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="72" font-weight="900" fill="#fff9e6">Lark-K</text>
+</svg>

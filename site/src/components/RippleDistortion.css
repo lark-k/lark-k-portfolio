@@ -1,0 +1,6 @@
+.ripple-distortion { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.ripple-fallback, .ripple-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ripple-fallback { object-fit: cover; }
+.ripple-canvas { opacity: 0; transition: opacity .3s; }
+.ripple-distortion.is-ready .ripple-canvas { opacity: 1; }
+.ripple-distortion canvas { display: block; width: 100%; height: 100%; }

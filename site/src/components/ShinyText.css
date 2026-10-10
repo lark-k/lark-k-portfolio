@@ -1,0 +1,29 @@
+.shiny-text {
+  position: relative;
+  display: inline-block;
+  -webkit-text-fill-color: currentColor;
+}
+
+.shiny-text__shine,
+.shiny-text__glow {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.shiny-text__glow {
+  filter: blur(0.14em);
+}
+
+/* Keep the original heading line boxes and inherited typography. */
+h1 > .shiny-text,
+.works-title h2 > .shiny-text {
+  display: block;
+}
