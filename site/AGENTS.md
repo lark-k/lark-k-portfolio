@@ -4,6 +4,8 @@ Run the local server yourself and open the preview in the browser available to t
 
 ## Portfolio decisions
 
+- Upgrade the expanded works cards using the supplied postcard reference: individual clay-style project illustrations above cream text areas, colored raised title labels, short repository-grounded Chinese introductions, technology tags, and direct links to the four corresponding `lark-k` GitHub repositories. Keep the original orange folder, sequential reveal, blurred backdrop, and collapse controls. Use editable HTML for project copy and individual generated raster illustrations; allow scrolling on small screens so every project remains readable. This supersedes the earlier image-only card anatomy.
+
 - Add the supplied React Bits Lanyard effect to the portfolio. The current integration is a draggable, reversible Lark-K badge on the homepage's right side, with local front/back/strap artwork; preserve the works-folder interaction.
 - Use `Lark-K` consistently for the brand throughout the platform, including the header, refresh transition, browser title, badge strap, and accessible labels. Do not append a branding period.
 - Apply the supplied React Bits StarBorder to “走进我的创作世界”, retaining its anchor navigation and arrow. Use the user's exact example parameters: color/trailColor `#ffffff`, duration 6, clockwise, 2 stars, trailLength 0.3, thickness 1, radius 12, glow 0.6, hover lap, sparkle and clickPulse enabled, dark theme. Pause rendering while loading, away from home, or document-hidden, and respect reduced motion.
