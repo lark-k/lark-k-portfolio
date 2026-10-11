@@ -23,6 +23,7 @@ __pycache__/
 .dev.vars.*
 !.dev.vars.example
 .wrangler/
+.netlify/
 
 # Local indexing, browser sessions, and editor settings
 .codegraph/

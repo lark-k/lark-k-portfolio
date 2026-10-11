@@ -73,6 +73,21 @@ site/dist/
 └── .openai/hosting.json
 ```
 
+## Netlify 部署
+
+正式网站：<https://lark-k-portfolio.netlify.app>。
+
+仓库根目录的 `netlify.toml` 使用 Node.js 22，在 `site/` 中运行 `npm run build`，发布 `site/dist/client/` 静态产物。
+
+首次关联站点并登录后，可从仓库根目录更新正式网站：
+
+```bash
+npm --prefix site run build
+npx netlify-cli deploy --prod --no-build --dir site/dist/client
+```
+
+本地站点关联记录位于 `.netlify/state.json`，已加入 `.gitignore`。
+
 ## 目录结构
 
 ```text
