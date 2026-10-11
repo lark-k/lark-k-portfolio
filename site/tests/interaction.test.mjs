@@ -30,7 +30,13 @@ test('the five requested resume entries precede works and reverse navigation pre
   }
   assert.equal(nextStoryStep('biography', 0, -1).scene, 'home');
   assert.equal(nextStoryStep('home', 0, -1).scene, 'home');
-  assert.equal(nextStoryStep('works', 4, 1).scene, 'works');
+  assert.equal(nextStoryStep('works', 4, 1).scene, 'preview');
+});
+
+test('preview follows the folder, stays at the end, and returns to the folder', () => {
+  assert.equal(nextStoryStep('works', 4, 1).scene, 'preview');
+  assert.equal(nextStoryStep('preview', 4, 1).scene, 'preview');
+  assert.equal(nextStoryStep('preview', 4, -1).scene, 'works');
 });
 
 test('rapid direction changes keep position and velocity continuous, then settle on the latest request', () => {

@@ -46,3 +46,9 @@ Before making substantial visual changes, use the Product Design plugin's `get-c
 When implementing from a selected generated mock, treat that image as the source of truth for layout, component anatomy, density, spacing, color, typography, visible content, and hierarchy.
 
 Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and `tests/sites-worker.test.mjs` intact so the same local prototype can be handed to Sites. Before a Sites handoff, run `npm run build` and `npm run test:sites`; the build must leave `dist/client/index.html`, `dist/server/index.js`, and `dist/.openai/hosting.json`.
+
+- Add a fourth scene after the works folder for circular project previews using the supplied React Bits CircularCarousel. Reuse the exact works background with a dark overlay. Keep the existing folder interaction. Default to newly generated, repository-informed concept artwork; clicking a cover enlarges it and reveals core project details and its direct GitHub URL. This request supersedes the earlier deferral of project detail pages.
+
+- The preview gallery must include all six pinned GitHub profile projects plus `energy-storage-software` (seven total). Replace the bright cream concept covers with a cohesive set of dark olive, softly lit illustrations that match the existing background. Keep concepts grounded in repository content; the inspection project is a visualization prototype. Generate the count from the project list.
+
+- Direct loads and refreshes of works or preview must use the supplied high-resolution `workstation-right.png` for the shared static background. The lower-resolution extracted `works-end.png` is only an error fallback; retain the native video final frame after forward travel.
