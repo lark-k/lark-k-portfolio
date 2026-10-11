@@ -12,9 +12,12 @@ import ProjectGallery from './components/ProjectGallery';
 import StarBorder from './components/StarBorder';
 import ShinyText from './components/ShinyText';
 import Biography from './components/Biography';
+import Possibility from './components/Possibility';
 import { SCENES, nextStoryStep } from './lib/biography';
 import { asset, pointerDirection } from './lib/interaction';
 import { createHeroFramePlayer } from './lib/heroFrames';
+import { transitionClips, CLIP_SPEED } from './lib/sceneTravel';
+import { createEndingScrubber, endingScrollSpan } from './lib/endingScrubber';
 
 const directionLabels = { default: 'LOOKING AT YOU', up: 'LOOKING UP', down: 'LOOKING DOWN', left: 'LOOKING LEFT', right: 'LOOKING RIGHT' };
 const Lanyard = lazy(() => import('./components/Lanyard'));
@@ -22,7 +25,9 @@ const GridScan = lazy(() => import('./components/GridScan').then(module => ({ de
 const headingShine = { color: '#f5f2df', shineColor: '#ffffff', shineAccent: '#eac17c', speed: 2, shineWidth: 40, softness: .8, trigger: 'loop', direction: 'right' };
 
 export function App() {
-  const heroFrameRef = useRef(null), transitionRef = useRef(null), biographyVideoRef = useRef(null), mediaRef = useRef(null);
+  const heroFrameRef = useRef(null), transitionRef = useRef(null), biographyVideoRef = useRef(null), possibilityVideoRef = useRef(null), mediaRef = useRef(null);
+  const journeyRef = useRef(null);
+  const endingScrubberRef = useRef(null), endingDistanceRef = useRef(0), endingSpanRef = useRef(1000);
   const playerRef = useRef(null), locked = useRef(false), stateRef = useRef({});
   const transitionFrameRef = useRef(null);
   const [scene, setScene] = useState(() => {
@@ -33,6 +38,9 @@ export function App() {
   const [transitionReady, setTransitionReady] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState('biography');
   const [transitionClip, setTransitionClip] = useState('biography');
+  const [heldClip, setHeldClip] = useState(null);
+  const [endingProgress, setEndingProgress] = useState(0);
+  const [endingScrollLinked, setEndingScrollLinked] = useState(false);
   const [biographyIndex, setBiographyIndex] = useState(0);
   const chapterChangedAt = useRef(0);
   const [direction, setDirection] = useState('default');
@@ -48,13 +56,15 @@ export function App() {
   stateRef.current = { scene, motion, folderOpen, reducedMotion, direction, entered, biographyIndex, transitionTarget };
   // Content enters when navigation starts. Completing (or chaining) a video
   // must keep the same content scene so its entrance never restarts.
-  const contentScene = motion === 'bridging' || motion === 'forward' ? transitionTarget : scene;
+  const contentScene = ['bridging', 'forward', 'scrubbing'].includes(motion) ? transitionTarget : scene;
   const worksVisible = contentScene === 'works';
   const biographyVisible = contentScene === 'biography';
   const homeVisible = contentScene === 'home';
   const homeBackdropVisible = scene === 'home' && motion !== 'forward';
   const worksSettled = ['works', 'preview'].includes(scene) && motion === 'idle';
   const previewVisible = contentScene === 'preview';
+  const possibilityVisible = contentScene === 'possibility' && (motion === 'idle' || (motion === 'scrubbing' && transitionReady));
+  const worksBackdropVisible = ['works', 'preview'].includes(scene) && (motion === 'idle' || !transitionReady);
 
   useEffect(() => {
     if (!entered || !homeVisible) { setBadgeActive(false); return; }
@@ -83,6 +93,39 @@ export function App() {
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    if (motion !== 'forward') return;
+    // A failed/stalled media request must never leave navigation locked.
+    const timer = window.setTimeout(() => {
+      const journey = journeyRef.current;
+      if (!journey) return;
+      [transitionRef, biographyVideoRef, possibilityVideoRef].forEach(ref => ref.current?.pause());
+      setTransitionReady(false); finishTravel(journey.target);
+    }, 12000);
+    return () => window.clearTimeout(timer);
+  }, [motion, transitionClip]);
+
+  useEffect(() => {
+    if (!reducedMotion || (!journeyRef.current && stateRef.current.motion !== 'scrubbing')) return;
+    const target = journeyRef.current?.target ?? 'possibility';
+    endingScrubberRef.current?.dispose();
+    setEndingProgress(1);
+    [transitionRef, biographyVideoRef, possibilityVideoRef].forEach(ref => ref.current?.pause());
+    setTransitionReady(false); finishTravel(target);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    if (motion !== 'scrubbing') return;
+    const scrubber = createEndingScrubber(possibilityVideoRef.current, {
+      onReady: () => setTransitionReady(true),
+      onProgress: setEndingProgress,
+      onComplete: () => { setHeldClip('possibility'); finishTravel('possibility'); },
+    });
+    endingScrubberRef.current = scrubber;
+    scrubber.setProgress(endingDistanceRef.current / endingSpanRef.current);
+    return () => { scrubber.dispose(); endingScrubberRef.current = null; };
+  }, [motion]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -120,54 +163,67 @@ export function App() {
 
   const finishTravel = target => {
     transitionFrameRef.current?.(); transitionFrameRef.current = null;
+    journeyRef.current = null;
     setScene(target); setMotion('idle'); locked.current = false;
     chapterChangedAt.current = performance.now();
     if (target === 'home') {
       setDirection('default'); setTransitionReady(false);
-      transitionRef.current.pause(); biographyVideoRef.current.pause(); playerRef.current.reset(); mediaRef.current = heroFrameRef.current;
+      transitionRef.current.pause(); biographyVideoRef.current.pause(); possibilityVideoRef.current.pause(); playerRef.current.reset(); mediaRef.current = heroFrameRef.current;
       if (!stateRef.current.reducedMotion) {
         setMotion('returning'); locked.current = true;
       }
     }
     history.replaceState(null, '', `#${target}`);
   };
+  const clipVideo = clip => ({ biography: biographyVideoRef, works: transitionRef, possibility: possibilityVideoRef })[clip].current;
+  const failTransition = clip => {
+    if (clip === 'possibility' && stateRef.current.motion === 'scrubbing') {
+      endingScrubberRef.current?.dispose();
+      setEndingProgress(1);
+      setTransitionReady(false); finishTravel('possibility'); return;
+    }
+    const journey = journeyRef.current;
+    if (!journey || journey.clip !== clip) return;
+    clipVideo(clip).pause(); setTransitionReady(false); finishTravel(journey.target);
+  };
+  const playNextClip = () => {
+    const journey = journeyRef.current;
+    if (!journey) return;
+    const clip = journey.clips.shift();
+    journey.clip = clip;
+    setTransitionClip(clip); setTransitionReady(false); setMotion('forward');
+    const video = clipVideo(clip);
+    video.currentTime = 0; video.playbackRate = CLIP_SPEED[clip];
+    video.play().catch(() => failTransition(clip));
+  };
   const travel = target => {
     const state = stateRef.current;
     if (!state.entered || locked.current || state.folderOpen || state.scene === target) return;
+    setEndingScrollLinked(false);
     locked.current = true;
-    // Each clip starts from its actual preceding scene, including direct home-to-works visits.
-    if (target === 'home' || state.reducedMotion || (['works', 'preview'].includes(state.scene) && ['works', 'preview'].includes(target))) {
-      transitionRef.current.pause(); biographyVideoRef.current.pause();
-      finishTravel(target); return;
-    }
-    if (state.scene !== 'home' && !['works', 'preview'].includes(target)) {
-      transitionRef.current.pause(); biographyVideoRef.current.pause();
+    const clips = state.reducedMotion ? [] : transitionClips(state.scene, target);
+    if (!clips.length) {
+      [transitionRef, biographyVideoRef, possibilityVideoRef].forEach(ref => ref.current.pause());
       setTransitionReady(false); finishTravel(target); return;
     }
+    journeyRef.current = { target, clips, clip: null };
     setDirection('default'); setTransitionTarget(target);
     setTransitionReady(false); setMotion('bridging');
-    const run = () => {
-      const clip = state.scene === 'home' ? 'biography' : 'works';
-      setTransitionClip(clip);
-      const video = clip === 'biography' ? biographyVideoRef.current : transitionRef.current;
-      video.currentTime = 0; video.playbackRate = clip === 'biography' ? 2.4 : 2.7;
-      setMotion('forward');
-      video.play().catch(() => { setTransitionReady(false); finishTravel(target); });
-    };
-    if (state.scene === 'home') playerRef.current.returnToFront(run);
-    else { biographyVideoRef.current.pause(); run(); }
+    if (state.scene === 'home') playerRef.current.returnToFront(playNextClip);
+    else { biographyVideoRef.current.pause(); playNextClip(); }
   };
-  const finishBiographyClip = () => {
-    if (!['works', 'preview'].includes(transitionTarget)) { finishTravel('biography'); return; }
+  const finishTransitionClip = clip => {
+    const journey = journeyRef.current;
+    if (!journey || journey.clip !== clip) return;
+    setHeldClip(clip);
+    if (!journey.clips.length) { finishTravel(journey.target); return; }
     transitionFrameRef.current?.(); transitionFrameRef.current = null;
-    // Hold the biography end frame while the following clip presents its first frame.
-    setScene('biography'); setTransitionReady(false); setTransitionClip('works');
-    const video = transitionRef.current;
-    video.currentTime = 0; video.playbackRate = 2.7;
-    video.play().catch(() => { setTransitionReady(false); finishTravel(transitionTarget); });
+    // Keep the preceding clip's actual end frame until the next presents a frame.
+    setScene(clip === 'biography' ? 'biography' : 'works');
+    playNextClip();
   };
   const revealTransition = video => {
-    if (!locked.current) return;
+    if (!locked.current || !journeyRef.current || clipVideo(journeyRef.current.clip) !== video) return;
     transitionFrameRef.current?.();
     // Keep the frozen canvas visible until a fresh video frame is presented,
     // including repeat visits when the video previously held its last frame.
@@ -196,7 +252,25 @@ export function App() {
   useEffect(() => {
     let wheelDelta = 0, lastWheel = 0, touchY = 0, gestureUsed = false;
     const wheel = event => {
-      if (stateRef.current.folderOpen || event.target.closest?.('.circular-carousel, .project-detail') || event.target.closest?.('.lanyard-canvas')?.style.cursor === 'grabbing') return;
+      const state = stateRef.current;
+      if (state.folderOpen || event.target.closest?.('.project-detail') || event.target.closest?.('.lanyard-canvas')?.style.cursor === 'grabbing') return;
+      if (state.entered && state.scene === 'preview' && Math.abs(event.deltaY) > Math.abs(event.deltaX) &&
+          (state.motion === 'scrubbing' || (state.motion === 'idle' && !locked.current && event.deltaY > 0))) {
+        event.preventDefault();
+        if (state.reducedMotion) { travel('possibility'); return; }
+        if (state.motion !== 'scrubbing') {
+          endingDistanceRef.current = 0; endingSpanRef.current = endingScrollSpan(innerHeight);
+          setEndingScrollLinked(true); setEndingProgress(0); setTransitionTarget('possibility'); setTransitionClip('possibility');
+          setTransitionReady(false); locked.current = true; setMotion('scrubbing');
+        }
+        const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1);
+        endingDistanceRef.current = Math.max(0, Math.min(endingSpanRef.current, endingDistanceRef.current + delta));
+        if (endingDistanceRef.current === 0 && delta < 0) {
+          endingScrubberRef.current?.dispose(); setTransitionReady(false); finishTravel('preview');
+        } else endingScrubberRef.current?.setProgress(endingDistanceRef.current / endingSpanRef.current);
+        return;
+      }
+      if (event.target.closest?.('.circular-carousel')) return;
       const panel = event.target.closest?.('.biography-layout');
       if (panel && panel.scrollHeight > panel.clientHeight + 1 &&
         ((event.deltaY > 0 && panel.scrollTop + panel.clientHeight < panel.scrollHeight - 2) || (event.deltaY < 0 && panel.scrollTop > 2))) return;
@@ -211,7 +285,7 @@ export function App() {
       if (stateRef.current.folderOpen || event.target.closest?.('.lanyard, .project-gallery, .project-detail') || !['ArrowDown','PageDown','ArrowUp','PageUp','ArrowLeft','ArrowRight','Home','End',' '].includes(event.key)) return;
       if (['BUTTON','A','INPUT'].includes(document.activeElement?.tagName)) return;
       event.preventDefault();
-      if (event.key === 'Home' || event.key === 'End') travelRef.current(event.key === 'Home' ? 'home' : 'preview');
+      if (event.key === 'Home' || event.key === 'End') travelRef.current(event.key === 'Home' ? 'home' : 'possibility');
       else stepStoryRef.current(['ArrowUp','PageUp','ArrowLeft'].includes(event.key) ? -1 : 1);
     };
     const start = event => {
@@ -230,24 +304,29 @@ export function App() {
   const navigate = (event, target) => { event.preventDefault(); if (target === 'biography' && scene !== 'biography') setBiographyIndex(0); travel(target); };
 
   return <main className="scroll-story">
-    <div className={`scene-stage ${entered ? 'is-entered' : ''} ${motion === 'returning' ? 'is-returning' : ''}`} inert={!entered ? true : undefined} style={{ backgroundImage: `url("${asset('images/background.png')}")` }}>
+    <div className={`scene-stage ${entered ? 'is-entered' : ''} ${motion === 'returning' ? 'is-returning' : ''} ${contentScene === 'possibility' ? 'is-possibility' : ''}`} inert={!entered ? true : undefined} style={{ backgroundImage: `url("${asset('images/background.png')}")` }}>
       <div className="character-field" style={{ opacity: scene === 'home' ? 1 : 0 }}>
         <RippleDistortion src={asset('frames/1280/up/01.webp?v=bt709-3')} fallbackSrc={asset(worksVisible ? 'images/workstation.png' : 'images/hero-poster.png')}
           mediaRef={mediaRef} brushSize={80} strength={.055} swirl={2.05} rings={3.75} grayscale={false}
           spread={6.5} fade={.9} spacing={8} dispersion={.5} tintAmount={0} quality="low" portraitFraming
           enabled={entered && trailEnabled && homeVisible && !folderOpen && !reducedMotion} active={!entered || (homeBackdropVisible && !folderOpen)} onLoadProgress={setHeroLoad} />
       </div>
-      <img className={`scene-still works-scene ${worksSettled ? 'is-visible' : ''}`} src={asset('images/workstation-right.png')} alt=""
+      <img className={`scene-still works-scene ${worksBackdropVisible ? 'is-visible' : ''}`} src={asset('images/workstation-right.png')} alt=""
         onError={event => { const image = event.currentTarget; if (!image.src.endsWith('/images/works-end.png')) image.src = asset('images/works-end.png'); }} />
       {/* Reverse visits use the sharp original; forward visits retain the video's
           final frame so its slightly different pose never jumps after playback. */}
       <img className={`scene-still biography-scene ${scene === 'biography' && (motion !== 'forward' || !transitionReady) ? 'is-visible' : ''}`} src={asset('images/biography-welcome.png')} alt="" />
-      <video className={`scene-video works-scene ${!reducedMotion && transitionReady && transitionClip === 'works' && (motion === 'forward' || worksSettled) ? 'is-visible' : ''}`} ref={transitionRef}
+      <video className={`scene-video works-scene ${!reducedMotion && ((transitionReady && transitionClip === 'works' && (motion === 'forward' || worksSettled)) || (heldClip === 'works' && worksBackdropVisible)) ? 'is-visible' : ''}`} ref={transitionRef}
         src={asset('videos/biography-to-works.mp4')} poster={asset('images/biography-to-works-poster.png')} muted playsInline preload="auto" aria-hidden="true"
-        onPlaying={event => revealTransition(event.currentTarget)} onEnded={() => finishTravel(transitionTarget)} />
-      <video className={`scene-video biography-video ${!reducedMotion && transitionReady && transitionClip === 'biography' && (motion === 'forward' || (scene === 'biography' && motion === 'idle')) ? 'is-visible' : ''}`} ref={biographyVideoRef}
+        onPlaying={event => revealTransition(event.currentTarget)} onEnded={() => finishTransitionClip('works')} onError={() => failTransition('works')} />
+      <video className={`scene-video biography-video ${!reducedMotion && ((transitionReady && transitionClip === 'biography' && (motion === 'forward' || (scene === 'biography' && motion === 'idle'))) || (heldClip === 'biography' && scene === 'biography' && !transitionReady)) ? 'is-visible' : ''}`} ref={biographyVideoRef}
         src={asset('videos/home-to-biography.mp4')} poster={asset('images/biography-start.png')} muted playsInline preload="auto" aria-hidden="true"
-        onPlaying={event => revealTransition(event.currentTarget)} onEnded={finishBiographyClip} />
+        onPlaying={event => revealTransition(event.currentTarget)} onEnded={() => finishTransitionClip('biography')} onError={() => failTransition('biography')} />
+      <img className={`scene-still possibility-scene ${scene === 'possibility' && motion === 'idle' ? 'is-visible' : ''}`} src={asset('images/possibility-backdrop.png')} alt=""
+        onError={event => { const image = event.currentTarget; if (!image.src.endsWith('/images/possibility-end.png')) image.src = asset('images/possibility-end.png'); }} />
+      <video className={`scene-video possibility-scene ${!reducedMotion && transitionReady && transitionClip === 'possibility' && (['forward', 'scrubbing'].includes(motion) || (scene === 'possibility' && motion === 'idle')) ? 'is-visible' : ''}`} ref={possibilityVideoRef}
+        src={asset('videos/preview-to-possibility.mp4')} poster={asset('images/possibility-start.png')} muted playsInline preload="auto" aria-hidden="true"
+        onPlaying={event => revealTransition(event.currentTarget)} onEnded={() => finishTransitionClip('possibility')} onError={() => failTransition('possibility')} />
       {reducedMotion && homeVisible && <img className="reduced-scene" src={asset('images/hero-poster.png')} alt="" />}
       <div className={`scene-vignette ${homeVisible ? 'is-home' : ''}`} aria-hidden="true" />
       {previewVisible && <div className="preview-shade" aria-hidden="true" />}
@@ -256,7 +335,8 @@ export function App() {
         <nav aria-label="主导航"><a href="#home" className={contentScene === 'home' ? 'is-active' : ''} aria-current={contentScene === 'home' ? 'page' : undefined} onClick={event => navigate(event, 'home')}>初次见面</a>
           <a href="#biography" className={contentScene === 'biography' ? 'is-active' : ''} aria-current={contentScene === 'biography' ? 'page' : undefined} onClick={event => navigate(event, 'biography')}>个人履历</a>
           <a href="#works" className={contentScene === 'works' ? 'is-active' : ''} aria-current={contentScene === 'works' ? 'page' : undefined} onClick={event => navigate(event, 'works')}>作品文件夹</a>
-          <a href="#preview" className={previewVisible ? 'is-active' : ''} aria-current={previewVisible ? 'page' : undefined} onClick={event => navigate(event, 'preview')}>作品预览</a></nav>
+          <a href="#preview" className={previewVisible ? 'is-active' : ''} aria-current={previewVisible ? 'page' : undefined} onClick={event => navigate(event, 'preview')}>作品预览</a>
+          <a href="#possibility" className={contentScene === 'possibility' ? 'is-active' : ''} aria-current={contentScene === 'possibility' ? 'page' : undefined} onClick={event => navigate(event, 'possibility')}>无限可能</a></nav>
         <div className="header-signature"><strong>AI & BACKEND DEVELOPER</strong><span>A curious mind. A world of ideas.</span></div>
       </header>
       <section id="home" className={`hero-content ${homeVisible ? 'is-visible' : ''}`} aria-label="初次见面" aria-hidden={!homeVisible} inert={!homeVisible || motion === 'returning' ? true : undefined}
@@ -306,9 +386,13 @@ export function App() {
         <p className="works-categories">AI PLATFORM · AI AGENT<br />QUANT · SMART ENERGY</p>
         <p className="works-footnote"><ArrowUpRight size={17} /> 小小文件夹，装着大大的好奇。</p>
       </section>
-      {entered && previewVisible && motion === 'idle' && <ProjectGallery reducedMotion={reducedMotion} onBack={() => travel('works')} onOpenChange={setFolderOpen} />}
+      {entered && previewVisible && motion === 'idle' && <ProjectGallery reducedMotion={reducedMotion} onBack={() => travel('works')} onNext={() => travel('possibility')} onOpenChange={setFolderOpen} />}
+      <Possibility visible={entered && possibilityVisible} scrollLinked={endingScrollLinked} progress={endingProgress} onRestart={() => travel('home')} />
+      {motion === 'scrubbing' && <div className="ending-scroll-cue" role="progressbar" aria-label="无限可能过渡进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(endingProgress * 100)}>
+        <span>向下滚动，让想法起飞</span><div className="ending-scroll-track"><i style={{ transform: `scaleX(${endingProgress})` }} /></div><ArrowDown size={18} />
+      </div>}
       {!reducedMotion && homeVisible && <button inert={folderOpen ? true : undefined} className={`trail-toggle ${trailEnabled ? 'is-on' : ''}`} aria-label={trailEnabled ? '关闭鼠标水波效果' : '开启鼠标水波效果'} aria-pressed={trailEnabled} onClick={() => setTrailEnabled(value => !value)}><Sparkle size={18} /><span>RIPPLE {trailEnabled ? 'ON' : 'OFF'}</span></button>}
-      <div key={`index-${contentScene}`} className="page-index" aria-hidden="true"><span>{String(SCENES.indexOf(contentScene) + 1).padStart(2, '0')}</span><span className="index-line" /><span>04</span></div>
+      <div key={`index-${contentScene}`} className="page-index" aria-hidden="true"><span>{String(SCENES.indexOf(contentScene) + 1).padStart(2, '0')}</span><span className="index-line" /><span>{String(SCENES.length).padStart(2, '0')}</span></div>
     </div>
     {!entered && <div className={`startup-transition ${prepared ? 'is-ready' : ''}`} role="status" aria-live="polite" aria-label={`首页资源加载中，${loadPercent}%`}>
       <div className="startup-background" aria-hidden="true"><Suspense fallback={null}>

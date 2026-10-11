@@ -4,9 +4,61 @@ import { readFileSync } from 'node:fs';
 import { pointerDirection, smoothstep, createVideoSeeker } from '../src/lib/interaction.js';
 import { advanceHeroMotion, createHeroMotion, HERO_DIRECTIONS } from '../src/lib/heroMotion.js';
 import { BIOGRAPHY, nextStoryStep } from '../src/lib/biography.js';
+import { transitionClips } from '../src/lib/sceneTravel.js';
+import { createEndingScrubber, endingScrollSpan } from '../src/lib/endingScrubber.js';
+
+function scrubHarness() {
+  let id = 0, now = 0, currentTime = 0, completed = 0, ready = 0;
+  const events = new Map(), frames = new Map(), progress = [];
+  const video = {
+    duration: 6, readyState: 2, seeking: false, paused: false,
+    get currentTime() { return currentTime; },
+    set currentTime(value) { currentTime = value; this.seeking = true; },
+    pause() { this.paused = true; },
+    addEventListener(name, callback) { events.set(name, callback); },
+    removeEventListener(name) { events.delete(name); },
+  };
+  const scrubber = createEndingScrubber(video, {
+    onReady() { ready++; }, onProgress(value) { progress.push(value); }, onComplete() { completed++; },
+  }, { request(callback) { frames.set(++id, callback); return id; }, cancel(key) { frames.delete(key); } });
+  const frame = (decode = true) => {
+    if (decode && video.seeking) { video.seeking = false; events.get('seeked')?.(); }
+    const queued = [...frames.values()]; frames.clear(); now += 16.667;
+    queued.forEach(callback => callback(now));
+  };
+  const settle = () => { for (let i = 0; i < 150 && frames.size; i++) frame(); };
+  return { video, scrubber, frame, settle, events, frames, progress, completed: () => completed, ready: () => ready };
+}
+
+test('ending wheel seeks coalesce, stop at the requested position, and can rewind', () => {
+  const h = scrubHarness();
+  h.scrubber.setProgress(.1); h.scrubber.setProgress(.3); h.scrubber.setProgress(.5);
+  assert.equal(h.frames.size, 1);
+  h.frame(false); assert.equal(h.video.currentTime, 0, 'wait for outstanding decode');
+  h.settle(); assert.ok(Math.abs(h.video.currentTime - 3) < .02);
+  const stopped = h.video.currentTime;
+  for (let i = 0; i < 30; i++) h.frame();
+  assert.equal(h.video.currentTime, stopped); assert.equal(h.video.paused, true);
+  assert.equal(h.completed(), 0); assert.equal(h.ready(), 1);
+  h.scrubber.setProgress(.75); h.settle(); assert.ok(h.video.currentTime > stopped);
+  h.scrubber.setProgress(.2); h.settle(); assert.ok(Math.abs(h.video.currentTime - 1.2) < .02);
+  h.scrubber.dispose(); assert.equal(h.events.size, 0); assert.equal(h.frames.size, 0);
+});
+
+test('ending completion waits for final-frame decode and fires only once', () => {
+  const h = scrubHarness(); h.scrubber.setProgress(1);
+  for (let i = 0; i < 25; i++) h.frame();
+  assert.equal(h.completed(), 1); assert.equal(h.progress.at(-1), 1);
+  h.scrubber.setProgress(1); h.frame(); assert.equal(h.completed(), 1);
+  h.scrubber.dispose();
+  const waiting = scrubHarness(); waiting.scrubber.setProgress(1);
+  for (let i = 0; i < 25; i++) waiting.frame(false);
+  assert.equal(waiting.completed(), 0); waiting.scrubber.dispose();
+  assert.equal(endingScrollSpan(200), 1000); assert.equal(endingScrollSpan(1000), 2200);
+});
 
 test('scene end frames, transition poster and right-positioned fallback are available', () => {
-  for (const name of ['works-end.png', 'biography-end.png', 'workstation-right.png', 'biography-to-works-poster.png']) {
+  for (const name of ['works-end.png', 'biography-end.png', 'workstation-right.png', 'biography-to-works-poster.png', 'possibility-start.png', 'possibility-end.png', 'possibility-backdrop.png']) {
     const file = readFileSync(new URL(`../public/assets/images/${name}`, import.meta.url));
     assert.equal(file.subarray(1, 4).toString(), 'PNG', `${name} must be a real PNG, not an HTML fallback`);
     assert.ok(file.readUInt32BE(16) >= 1280, `${name} must contain the full-resolution scene`);
@@ -33,10 +85,25 @@ test('the five requested resume entries precede works and reverse navigation pre
   assert.equal(nextStoryStep('works', 4, 1).scene, 'preview');
 });
 
-test('preview follows the folder, stays at the end, and returns to the folder', () => {
+test('preview leads to possibility, which stays at the end and returns to preview', () => {
   assert.equal(nextStoryStep('works', 4, 1).scene, 'preview');
-  assert.equal(nextStoryStep('preview', 4, 1).scene, 'preview');
+  assert.equal(nextStoryStep('preview', 4, 1).scene, 'possibility');
   assert.equal(nextStoryStep('preview', 4, -1).scene, 'works');
+  assert.equal(nextStoryStep('possibility', 4, 1).scene, 'possibility');
+  assert.equal(nextStoryStep('possibility', 4, -1).scene, 'preview');
+});
+
+test('forward video chains reach the final scene from every preceding page; return visits skip playback', () => {
+  assert.deepEqual(transitionClips('home', 'possibility'), ['biography', 'works', 'possibility']);
+  assert.deepEqual(transitionClips('biography', 'possibility'), ['works', 'possibility']);
+  assert.deepEqual(transitionClips('works', 'possibility'), ['possibility']);
+  assert.deepEqual(transitionClips('preview', 'possibility'), ['possibility']);
+  assert.deepEqual(transitionClips('possibility', 'home'), []);
+  assert.deepEqual(transitionClips('possibility', 'preview'), []);
+  assert.deepEqual(transitionClips('possibility', 'works'), []);
+  assert.deepEqual(transitionClips('possibility', 'biography'), []);
+  assert.deepEqual(transitionClips('home', 'preview'), ['biography', 'works']);
+  assert.deepEqual(transitionClips('preview', 'works'), []);
 });
 
 test('rapid direction changes keep position and velocity continuous, then settle on the latest request', () => {

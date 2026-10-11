@@ -36,5 +36,6 @@ shutil.copy2(PUBLIC / 'images/home-to-biography-poster.png', PUBLIC / 'images/bi
 for obsolete in ['videos/folder-hover.webm', 'documents/resume-liangke.pdf']:
     (PUBLIC / obsolete).unlink(missing_ok=True)
 (PUBLIC / 'videos/transition-return.mp4').unlink(missing_ok=True)
+subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-possibility.py'))], check=True)
 subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-hero.py'))], check=True)
 print('Original images and videos copied unchanged; preview posters extracted.')

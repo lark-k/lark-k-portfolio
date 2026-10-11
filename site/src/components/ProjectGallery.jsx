@@ -61,7 +61,7 @@ function ProjectDetail({ project, origin, reducedMotion, onClose }) {
   </div>, document.body);
 }
 
-export default function ProjectGallery({ reducedMotion, onBack, onOpenChange }) {
+export default function ProjectGallery({ reducedMotion, onBack, onNext, onOpenChange }) {
   const controls = useRef(null), gallery = useRef(null), previousFocus = useRef(null);
   const [active, setActive] = useState(0), [paused, setPaused] = useState(false), [selected, setSelected] = useState(null);
   const open = (project, index) => {
@@ -86,7 +86,7 @@ export default function ProjectGallery({ reducedMotion, onBack, onOpenChange }) 
         onChange={setActive} onItemClick={open} controlsRef={controls} />
     </div>
     <div className="gallery-caption"><p>{PROJECTS[active].category}</p><button onClick={() => open(PROJECTS[active], active)}>{PROJECTS[active].title}<span aria-hidden="true">↗</span></button><span>{String(active + 1).padStart(2, '0')} <i>/ {String(PROJECTS.length).padStart(2, '0')}</i></span></div>
-    <footer className="gallery-footer"><button className="gallery-back" onClick={onBack}>← 返回作品文件夹</button><div className="gallery-controls"><button aria-label="上一个作品" onClick={() => controls.current?.stepBy(-1)}>←</button>{!reducedMotion && <button className="gallery-pause" onClick={() => setPaused(value => !value)} aria-label={paused ? '播放环形轮播' : '暂停环形轮播'} aria-pressed={paused}>{paused ? '播放' : '暂停'}</button>}<button aria-label="下一个作品" onClick={() => controls.current?.stepBy(1)}>→</button></div><span className="gallery-hint">左右拖动探索 · 点击进入</span></footer>
+    <footer className="gallery-footer"><button className="gallery-back" onClick={onBack}>← 返回作品文件夹</button><div className="gallery-controls"><button aria-label="上一个作品" onClick={() => controls.current?.stepBy(-1)}>←</button>{!reducedMotion && <button className="gallery-pause" onClick={() => setPaused(value => !value)} aria-label={paused ? '播放环形轮播' : '暂停环形轮播'} aria-pressed={paused}>{paused ? '播放' : '暂停'}</button>}<button aria-label="下一个作品" onClick={() => controls.current?.stepBy(1)}>→</button></div><button className="gallery-next" onClick={onNext}>无限可能 <span aria-hidden="true">↗</span></button></footer>
     {selected && <ProjectDetail {...selected} reducedMotion={reducedMotion} onClose={close} />}
   </section>;
 }

@@ -39,7 +39,7 @@ export const BIOGRAPHY = [
   },
 ];
 
-export const SCENES = ['home', 'biography', 'works', 'preview'];
+export const SCENES = ['home', 'biography', 'works', 'preview', 'possibility'];
 
 export function nextStoryStep(scene, index, direction) {
   const forward = direction > 0;
@@ -49,6 +49,7 @@ export function nextStoryStep(scene, index, direction) {
     return { scene: forward ? 'works' : 'home', index };
   }
   if (scene === 'home') return { scene: forward ? 'biography' : 'home', index: 0 };
-  if (scene === 'preview') return { scene: forward ? 'preview' : 'works', index };
+  if (scene === 'preview') return { scene: forward ? 'possibility' : 'works', index };
+  if (scene === 'possibility') return { scene: forward ? 'possibility' : 'preview', index };
   return { scene: forward ? 'preview' : 'biography', index: BIOGRAPHY.length - 1 };
 }

@@ -11,7 +11,7 @@ export const PROJECTS = [
       ['生成到交付', '流式输出、在线预览、应用部署与源码下载贯通完整流程。'],
       ['工程化编排', 'LangGraph4j 编排生成与质检，异步构建，并提供单体与微服务实现。'],
     ],
-    alt: '深橄榄绿创作工作台上，对话气泡连接笔记本与层叠应用窗口',
+    alt: '真实软件工作站的显示器呈现自然语言对话、代码与生成应用预览',
   },
   {
     id: 'agent', title: 'AI 超级智能体', subtitle: '让思考，走向行动。', category: 'AUTONOMOUS AGENT',
@@ -22,7 +22,7 @@ export const PROJECTS = [
       ['知识增强对话', '情感咨询场景接入百炼知识库 RAG，支持会话记忆与 SSE 流式回复。'],
       ['连接外部能力', '统一接入本地工具与 MCP 服务，覆盖搜索、文件处理、PDF 生成和图片检索。'],
     ],
-    alt: '暖色台灯下，陶瓷智能体通过书本、放大镜与工具协作处理任务',
+    alt: '精密计算芯片与电路上方呈现知识检索、任务编排和工具调用界面',
   },
   {
     id: 'quant', title: '基金量化研究平台', subtitle: '让每一次判断，都有依据。', category: 'QUANT RESEARCH',
@@ -33,7 +33,7 @@ export const PROJECTS = [
       ['可验证的策略', 'Python 引擎生成多因子信号，历史回测对照同仓位基准，分析收益与回撤。'],
       ['有边界的 AI 解读', '规则引擎决定动作与风险项，AI 提供结构化解读，辅助理解策略依据。'],
     ],
-    alt: '深绿色量化研究桌面上的数据曲线、配置圆盘与分析笔记',
+    alt: '专业量化研究终端展示行情曲线、资产配置与历史回撤分析',
   },
   {
     id: 'energy', title: '新型能源智能辨识', subtitle: '从复杂波形，读懂能源。', category: 'ENERGY INTELLIGENCE',
@@ -44,7 +44,7 @@ export const PROJECTS = [
       ['模型全生命周期', '从数据采集、模型训练、验证到应用管理，衔接前端、业务后台与模型服务。'],
       ['反馈与追溯', '支持反馈校正、实时事件与分钟级追溯，定位监测结果的变化过程。'],
     ],
-    alt: '暮色中的微型配电台区，光伏、能源站与充电桩上方呈现分离波形',
+    alt: '暮色中的真实光伏阵列与变电设施，叠加能源监测和分离波形',
   },
   {
     id: 'inspection', title: '低空空地协同巡检', subtitle: '从空中视角，发现细微之处。', category: 'AIR–GROUND INSPECTION',
@@ -55,7 +55,7 @@ export const PROJECTS = [
       ['飞行任务总览', '集中呈现飞行距离、时长与任务进度，结合轨迹地图、航点和缩放浏览任务。'],
       ['缺陷分类检索', '按分类与关键词查找缺陷，查看示例图片及元数据，演示数字化巡检管理流程。'],
     ],
-    alt: '深橄榄绿微缩地形上，无人机沿铜色航线巡查输电塔与电力部件',
+    alt: '搭载云台相机的工业无人机巡查输电塔，旁边展示缺陷定位与航线',
   },
   {
     id: 'gallery', title: '拾光 · 手势粒子相册', subtitle: '让回忆，在指尖流动。', category: 'STILLSPACE / INTERACTIVE ART',
@@ -66,10 +66,11 @@ export const PROJECTS = [
       ['手势交互', '张掌控制环形画廊旋转，食指停留选择照片；同时提供鼠标、触摸与按钮操作。'],
       ['多用户相册', '支持登录、创建相册、上传照片与封面编辑，通过 SQLite 和私有 OSS 保存与管理内容。'],
     ],
-    alt: '幽绿微缩森林中，手势引导悬浮照片化为暖色粒子，映在静谧水面上',
+    alt: '真实手势指向沉浸式影像墙，森林照片的边缘逐渐分解为光粒子',
   },
   {
     id: 'storage', title: '储能负荷分析软件', subtitle: '从负荷曲线，寻找储能线索。', category: 'STORAGE INSIGHT / DESKTOP',
+    cover: 'preview-storage-v3-unoccupied.webp',
     repo: 'energy-storage-software', tags: ['Python', 'PySide6', 'PyTorch', 'Matplotlib'],
     description: '面向用户侧储能辨识的 Windows 中文桌面软件，将负荷曲线导入、本地模型推理、结果核实与报告导出组织为可复查的分析流程。',
     features: [
@@ -77,6 +78,6 @@ export const PROJECTS = [
       ['核实与解释', '逐项核实辨识结果的正确与错误，查看关键时段解释，对照曲线检查模型判断。'],
       ['本地处理与导出', '负荷数据与模型推理均在本地处理，可导出 Excel 与曲线图片，支持打包安装使用。'],
     ],
-    alt: '暗绿色储能分析工作台上，电池柜与显示负荷曲线的屏幕、核实报告相连',
+    alt: '无人储能实验室中，电池柜前的电脑展示负荷曲线、关键时段和分析结果',
   },
-].map(project => ({ ...project, src: asset(`images/preview-${project.id}-v2.png`), href: `https://github.com/lark-k/${project.repo}` }));
+].map(project => ({ ...project, src: asset(`images/${project.cover ?? `preview-${project.id}-v3.webp`}`), href: `https://github.com/lark-k/${project.repo}` }));

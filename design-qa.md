@@ -1,39 +1,46 @@
-# Works scene and stationary folder — design QA
+# Possibility ending and scroll transition — design QA
 
 final result: passed
 
-## Current visual target
+## Current target
 
-User references: `codex-clipboard-6d347725-a434-448e-b510-d96cefe09b93.png` (left-side folder), `codex-clipboard-131df144-c7df-4f03-8791-b47cd7eedf5b.png` (stationary folder), and `codex-clipboard-1f527dd1-be4c-499c-8e73-2ee0378fe47b.png` (remove scrollbars, clear the laptop). These references and the implementation were compared in the same image inspection calls. The final adaptation retains four actual projects and original character artwork.
+Use the supplied ending screenshot (`codex-clipboard-f4af3d24-f56d-4e0e-a167-af05d972ef1f.png`) for the cream Anton title, section label, lower-left manifesto and lower-right return button. Use the supplied falling video and generated character artwork for the scene. Preserve the existing Lark-K brand and original pages.
+
+Latest interaction direction: only vertical wheel travel from project previews to the ending scrubs the video. Content enters during playback with delayed, progress-linked phases and finishes with the video. Direct refresh must use the sharper original artwork.
 
 ## Resolved findings
 
-- P1: The expanded spread previously filled the screen. It now occupies the left side, leaving the right-side character and laptop visible.
-- P1: Opening moved and resized the folder. Both images now use shared viewport anchor coordinates and width. At 1600 × 900, closed and open image bounds are identical: x=203.5, y=558, width=297, height=222.75. The hover translation and arriving-folder transform are removed.
-- P1: Card overflow caused horizontal and vertical scrollbars and clipped the illustrations. Removed scroll containers; a ResizeObserver fits the natural card row to available vertical space without changing image aspect ratio. All four cards remain fully visible.
-- P2: The background was excessively blurred. Blur is now 4px with a 12% dark backdrop, preserving the underlying scene.
-- P2: The transition ended in a centered composition. The new biography-to-works video is used; its exact last frame supplies the full-screen still with the character on the lower right. No separate character cutout or smeared background extension is used.
+- P1: A threshold-triggered complete video did not follow the wheel. Replaced this route with accumulated wheel distance and serialized, coalesced native video seeks. A faster gesture advances farther; no new input settles at the current target.
+- P1: Waiting until the video finished delayed all ending copy. Copy now follows decoded video progress: label 10–30%, title 25–55%, manifesto 50–80%, supporting copy 65–90%, button 80–100%. There is no replay of the entrance after completion. Upward scrubbing reverses these phases and reaching zero restores the gallery.
+- P2: Enlarging the 1280 × 720 video extraction softened the refresh background. Refresh, direct navigation and reduced-motion fallback now use the original 1672 × 941 artwork. Browser inspection confirms its natural dimensions, filter none, opacity 1, and the hidden video layer at opacity 0 after refresh.
+- P2: The initial title sat lower than the reference. Aligned the heading to 13.2% from the top and tightened label spacing; it clears the character's face.
+- P2: Compact mobile dimensions needed different wrapping. The title wraps to two lines, navigation uses a second row, and the footer stacks. The 390 × 844 view has no horizontal overflow; earlier 320 × 568 verification also passed.
 
-No outstanding actionable P0/P1/P2 findings for the requested scope.
+No outstanding actionable P0/P1/P2 findings in the requested scope.
 
-## Browser evidence
+## Visual evidence
 
-Screenshots under `site/qa/`, captured in the in-app browser at approximately 1× pixel density:
+Images are under `output/possibility/qa/`:
 
-- `works-collapsed-final.png`: desktop 1600 × 900, small folder on the left below the heading.
-- `works-expanded-left-final.png`: desktop 1600 × 900, four cream project cards, stationary folder and visible laptop.
-- `works-tablet-final.png`: 1024 × 768, four compact cards on the left, complete illustrations and project links.
-- `works-mobile-final.png`: 390 × 844, two-by-two grid, all descriptions and links visible, folder below. Category labels and technology tags are omitted only at this narrow breakpoint to preserve legibility.
+- `comparison-latest.jpg`: reference and final refreshed page normalized to the same 1280 × 690 viewport and inspected together. Matches hierarchy, centered cream title, olive palette, footer arrangement and overall density.
+- `scroll-progress.jpg`: paused video at approximately 88.6%; heading and manifesto fully visible, button opacity approximately 0.428. The same timestamp and opacity remained stable on a subsequent read without input.
+- `scroll-complete.jpg`: native final frame, full content opacity and enabled return control; progress HUD removed.
+- `refresh-sharp.jpg`: final desktop refresh using the high-resolution source.
+- `mobile-sharp.jpg`: 390 × 844 responsive refresh, legible navigation, title and footer, scrollWidth equals viewport width.
 
-Desktop typography, wrapping, illustration crop, cream/brown/olive/blue/terracotta colors, card spacing and folder separation were inspected. Browser measurements confirm visible overflow on the card row rather than an internal scroll container; mobile dialog scrollWidth equals clientWidth (390px).
+Intentional adaptations: Lark-K branding and local identity replace the reference brand; the character and floating tools use the user's production assets. Source screenshot playback control, cursor and social captions are omitted. Native playback retains the actual video frame; direct refresh uses the sharper original artwork, whose pose differs slightly from the generated video's final frame. The video starts with a centered seated character while the preview backdrop has the character on the right; a brief 0.4-second full-frame blend eases that source mismatch without stretching or patching the scene.
 
-## Interaction and media checks
+## Functional checks
 
-- Escape and the close control collapse the spread. Tab from the close control cycles to the first project link; underlying scene content is inert during the dialog.
-- Original four project links and source images are preserved.
-- The final biography chapter's wheel action starts `biography-to-works.mp4` and settles on the works scene. Homepage direct works navigation plays both forward clips in sequence and reaches the same final composition.
-- The archived and served copies of the new video have matching SHA-256 hashes. It is copied without re-encoding.
-- Seven interaction/media tests and the static production build pass. The existing Three.js bundle-size advisory remains.
-- No deployment was performed.
+- Actual in-app browser wheel input over the carousel advances the transition without changing horizontal carousel behavior.
+- Small wheel movement settled at 1.233 seconds; a larger gesture advanced to 5.343 seconds. The video remains paused because progression comes from wheel seeks.
+- Reversing a gesture moved backward; reversing to zero restored `#preview` and its seven-project gallery.
+- Completion reached 6.028 seconds of the 6.033-second browser clip, content progress 1, both heading and button opacity 1, with no second entrance animation.
+- The original works-folder-to-preview wheel navigation still advances normally without the ending progress HUD.
+- Explicit ending button navigation uses native playback at rate 1 and does not enter scroll-linked mode.
+- Browser error/warning log was empty after the verified refresh and scroll flows.
+- The browser video uses short keyframe intervals for seeking, retaining 1280 × 720 at 60 fps. The supplied original remains archived intact.
+- All 11 interaction/media tests and the production build pass. The existing Three.js chunk-size advisory remains.
+- No deployment performed.
 
-This report supersedes older layout and temporary-transition notes in `site/design-qa.md`.
+The previous works-folder QA report is preserved at `output/possibility/qa/previous-design-qa.md`.
